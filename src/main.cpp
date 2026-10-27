@@ -1,6 +1,6 @@
 #include <iostream>
 #include <vector>
-
+#include <algorithm>
 #include "camera.h"
 #include <SFML/Graphics.hpp>
 
@@ -124,24 +124,47 @@ int main() {
         }
         player.update();
         // camera
+    
+        // Camera tracking
+        // Player position is at the bottom-center of the sprite.
+        sf::Vector2f playerCenterWorld = {
+            player.position.x,
+            player.position.y - PLAYER_WIDTH * 0.5f
+        };
 
-        // TODO: Remove this line and replace it with code that determines if the player's (center)
-        // is between the two green lines (open space), in the soft exclusion zones (between the
-        // green and red lines), or in the hard exclusion zones (beyond either of the red lines).
-        //
-        // If the player is in the open zone, the camera does not need to move.
-        //
-        // If the player is in the soft exclusion zones, the camera should softly translate over
-        // multiple frames (via an exponential moving average) until the player's center is aligned
-        // with the violated soft boundary. Use SOFT_CAMERA_ALPHA for the alpha value.
-        //
-        // If the player is in the hard exclusion zones, the camera should hard-adjust so that
-        // the player's center is always kept at most *at* the red lines. This means that the
-        // player center must NEVER pass the red lines.
-        //
-        // Use SOFT_LIMIT_PERCENT and HARD_LIMIT_PERCENT to parameterize the green and red
-        // line positions.
-        camera.setCameraCenter({player.position.x, WINDOW_HEIGHT * 0.5f});
+        float playerX = camera.worldToWindow(playerCenterWorld).x;
+
+        // Green lines: soft boundaries
+        float leftGreenX = windowSize.x * SOFT_LIMIT_PERCENT;
+        float rightGreenX = windowSize.x * (1.f - SOFT_LIMIT_PERCENT);
+
+        // Red lines: hard boundaries
+        float leftRedX = windowSize.x * HARD_LIMIT_PERCENT;
+        float rightRedX = windowSize.x * (1.f - HARD_LIMIT_PERCENT);
+
+        float cameraDeltaX = 0.f;
+
+        // HARD LEFT
+        if (playerX < leftRedX) {
+            cameraDeltaX = playerX - leftRedX;
+        }
+        // HARD RIGHT
+        else if (playerX > rightRedX) {
+            cameraDeltaX = playerX - rightRedX;
+        }
+        // SOFT LEFT
+        else if (playerX < leftGreenX) {
+            cameraDeltaX = SOFT_CAMERA_ALPHA * (playerX - leftGreenX);
+        }
+        // SOFT RIGHT
+        else if (playerX > rightGreenX) {
+            cameraDeltaX = SOFT_CAMERA_ALPHA * (playerX - rightGreenX);
+        }
+
+        // DEAD ZONE: cameraDeltaX stays zero.
+        camera.translateWindow({cameraDeltaX, 0.f});
+
+        //camera.setCameraCenter({player.position.x, WINDOW_HEIGHT * 0.5f});
 
         worldView.setCenter(camera.getCameraCenter());
         window.clear(sf::Color::Black);
